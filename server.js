@@ -1,3 +1,5 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -142,7 +144,12 @@ async function main() {
 }
 
 // Start server when run directly
-if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, "/"))) {
+const isMain =
+  process.argv[1] &&
+  path.resolve(process.argv[1]).toLowerCase() ===
+    fileURLToPath(import.meta.url).toLowerCase();
+
+if (isMain) {
   main().catch((error) => {
     console.error("Error starting server:", error);
     process.exit(1);
