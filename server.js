@@ -11,25 +11,73 @@ const server = new McpServer({
 });
 
 /**
- * Generates natural spoken Alexa dialogue matching the detected sound and room.
+ * Generates natural spoken Alexa dialogue matching the detected sound, room, and household occupancy.
  */
-function generateAlexaDialogue(audioEvent, location) {
+function generateAlexaDialogue(audioEvent, location, isHomeAlone = true) {
   const eventLower = (audioEvent || "").toLowerCase();
   const room = location && location.trim().toLowerCase() !== "general" ? ` in the ${location.trim()}` : "";
 
+  if (!isHomeAlone) {
+    // Multi-person household: prompt others to check, then follow up
+    if (eventLower.includes("fall") || eventLower.includes("crash") || eventLower.includes("thud")) {
+      return {
+        initial_announcement: `It sounds like someone had a fall${room}. Please can someone go and check on them?`,
+        followup_check: "Is everything okay? Should I call emergency services?",
+      };
+    }
+    if (eventLower.includes("scream") || eventLower.includes("screaming")) {
+      return {
+        initial_announcement: `I heard what sounded like screaming${room}. Please can someone go and check on them?`,
+        followup_check: "Is everything okay? Should I call emergency services?",
+      };
+    }
+    if (eventLower.includes("chok") || eventLower.includes("cannot breathe") || eventLower.includes("gasp")) {
+      return {
+        initial_announcement: `I detected breathing distress${room}. Please check on them right now!`,
+        followup_check: "Do they need emergency services?",
+      };
+    }
+    if (eventLower.includes("glass") || eventLower.includes("shatter")) {
+      return {
+        initial_announcement: `I heard glass breaking${room}. Please can someone go and check?`,
+        followup_check: "Is everyone alright? Does anyone need first aid?",
+      };
+    }
+    return {
+      initial_announcement: `I detected an unusual sound (${audioEvent})${room}. Please can someone check on them?`,
+      followup_check: "Is everything okay? Should I call emergency services?",
+    };
+  }
+
+  // Solo resident (Home alone): speak directly to the individual
   if (eventLower.includes("scream") || eventLower.includes("screaming")) {
-    return `I heard what sounded like screaming${room}. Are you okay? Should I call emergency services?`;
+    return {
+      initial_announcement: `I heard what sounded like screaming${room}. Are you okay? Should I call emergency services?`,
+      followup_check: null,
+    };
   }
   if (eventLower.includes("fall") || eventLower.includes("crash") || eventLower.includes("thud")) {
-    return `It sounds like someone had a fall${room}. Are you hurt? Do you need me to call for help?`;
+    return {
+      initial_announcement: `It sounds like someone had a fall${room}. Are you hurt? Do you need me to call for help?`,
+      followup_check: null,
+    };
   }
   if (eventLower.includes("chok") || eventLower.includes("cannot breathe") || eventLower.includes("gasp")) {
-    return `I detected breathing distress${room}. Are you okay? Say yes if you need an ambulance now.`;
+    return {
+      initial_announcement: `I detected breathing distress${room}. Are you okay? Say yes if you need an ambulance now.`,
+      followup_check: null,
+    };
   }
   if (eventLower.includes("glass") || eventLower.includes("shatter")) {
-    return `I heard glass breaking${room}. Is everyone alright?`;
+    return {
+      initial_announcement: `I heard glass breaking${room}. Is everyone alright?`,
+      followup_check: null,
+    };
   }
-  return `I detected an unusual sound (${audioEvent})${room}. Are you okay?`;
+  return {
+    initial_announcement: `I detected an unusual sound (${audioEvent})${room}. Are you okay?`,
+    followup_check: null,
+  };
 }
 
 /**
@@ -102,19 +150,21 @@ function assessAudioEmergency(audioEvent, location = "general", isHomeAlone = tr
     timeoutSeconds = 45;
   }
 
-  const alexaDialogue = generateAlexaDialogue(audioEvent, location);
+  const dialogue = generateAlexaDialogue(audioEvent, location, isHomeAlone);
 
   return {
     audio_event: audioEvent,
     location: location || "general",
+    household_mode: isHomeAlone ? "solo_resident" : "multi_person_household",
     priority_level: priority,
     silence_house_required: silenceHouse,
-    alexa_spoken_dialogue: alexaDialogue,
+    alexa_spoken_dialogue: dialogue.initial_announcement,
+    alexa_followup_dialogue: dialogue.followup_check,
     is_home_alone: isHomeAlone,
     unresponsive_timeout_seconds: timeoutSeconds,
-    escalation_protocol: isHomeAlone && timeoutSeconds
-      ? `If resident does not respond within ${timeoutSeconds}s: Tier 1 alerts Emergency Contact (Next of Kin). If unanswered or critical, Tier 2 dispatches 999 emergency services.`
-      : "Check in with household members via two-way intercom.",
+    escalation_protocol: isHomeAlone
+      ? `If solo resident does not respond within ${timeoutSeconds}s: Tier 1 alerts Emergency Contact (Next of Kin). If unanswered or critical, Tier 2 dispatches 999 emergency services.`
+      : `Broadcasts initial check-in across household Echos. Follows up after 15-20s asking: "${dialogue.followup_check}"`,
     recommendation,
     timestamp: new Date().toISOString(),
   };

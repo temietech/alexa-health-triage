@@ -29,11 +29,13 @@ flowchart TD
 Under the `HomeHealthTriage` namespace, the server registers 4 custom tools:
 
 ### 1. `assess_audio_emergency`
-- **Description**: Evaluates acoustic events and room location, calculates medical triage priority (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`), formulates spoken Alexa dialogue, and sets unresponsive timeout limits.
+- **Description**: Evaluates acoustic events and room location, calculates medical triage priority (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`), formulates spoken Alexa dialogue tailored to household occupancy, and sets timeout limits.
 - **Input Parameters**:
   - `audio_event` (string, required): Acoustic event description (e.g. `'child screaming'`, `'fall detected'`, `'loud crash'`).
   - `location` (string, optional): Room/zone where detected (e.g. `'kitchen'`, `'bathroom'`, `'stairs'`).
-  - `is_home_alone` (boolean, optional, default: `true`): Activates the unresponsive escalation timer.
+  - `is_home_alone` (boolean, optional, default: `true`):
+    - **Multi-Person (`false`)**: Prompts others in the house (*"It sounds like someone had a fall in the bathroom. Please can someone go and check on them?"*) followed 15s later by (*"Is everything okay? Should I call emergency services?"*).
+    - **Solo Resident (`true`)**: Direct check-in (*"Are you hurt? Do you need me to call for help?"*) with 30s unresponsive escalation.
 
 ### 2. `silence_home_audio`
 - **Description**: Immediately pauses media playback across all household Echo devices (Kitchen, Living Room, Bedroom, Bathroom, Hallway) so the emergency announcement is heard clearly without background interference.
